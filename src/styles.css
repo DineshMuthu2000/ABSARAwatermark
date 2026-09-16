@@ -148,7 +148,7 @@ button:focus-visible,input:focus-visible { outline:2px solid #c9a227; outline-of
 
 /* UI folder-based luxury composition */
 body {
-  background: #eef4e4 url('/UI/UI%20Background%201.png') center center / cover fixed no-repeat !important;
+  background: #eef4e4 url('/assets/UI%20Background%201.png') center center / cover fixed no-repeat !important;
 }
 
 .app-shell {

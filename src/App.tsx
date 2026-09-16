@@ -71,7 +71,8 @@ type Preset = {
   is4k?: boolean;
 };
 
-const defaultLogo = "/UI/water mark png.png";
+const defaultLogo = "/assets/water mark png.png";
+const defaultLogoAssetPath = "/assets/Absara LOGO 1.png";
 const defaultSettings: Settings = {
   logoData: defaultLogo,
   companyName: "ABSARA BEAUTY PARLOUR & ACADEMY",
@@ -158,7 +159,9 @@ function readSettings(): Settings {
       ...defaultSettings,
       ...saved,
       logoData:
-        saved.logoData === "/water mark png.png"
+        saved.logoData === "/water mark png.png" ||
+        saved.logoData === "/UI/water mark png.png" ||
+        saved.logoData === "water mark png.png"
           ? defaultLogo
           : saved.logoData || defaultLogo,
     };
@@ -170,7 +173,10 @@ function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = reject;
+    image.onerror = () => {
+      console.error(`Default watermark asset failed to load: ${src}`);
+      reject(new Error(`Failed to load image asset: ${src}`));
+    };
     image.src = src;
   });
 }
@@ -482,7 +488,7 @@ function App() {
           <div className="brand-mark-wrap">
             <img
               className="brand-mark"
-              src="/UI/Absara LOGO 1.png"
+              src={defaultLogoAssetPath}
               alt="ABSARA logo"
             />
           </div>
