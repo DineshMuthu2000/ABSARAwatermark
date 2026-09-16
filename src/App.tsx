@@ -73,6 +73,8 @@ type Preset = {
 
 const defaultLogo = "/assets/water mark png.png";
 const defaultLogoAssetPath = "/assets/Absara LOGO 1.png";
+const maxFileSize = 100 * 1024 * 1024;
+const acceptedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const defaultSettings: Settings = {
   logoData: defaultLogo,
   companyName: "ABSARA BEAUTY PARLOUR & ACADEMY",
@@ -189,6 +191,13 @@ function fileToDataUrl(file: File) {
   });
 }
 function bytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 function ratio(width: number, height: number) {
@@ -383,15 +392,41 @@ function App() {
     };
   }, [settings, images.length]);
   const addFiles = async (fileList: FileList | File[]) => {
-    const files = Array.from(fileList).filter((file) =>
-      ["image/jpeg", "image/png", "image/webp"].includes(file.type),
-    );
-    if (!files.length) {
-      setNotice("Please choose a JPG, PNG, or WEBP image.");
+    const files = Array.from(fileList);
+    const validFiles: File[] = [];
+    const rejectedFiles: string[] = [];
+
+    for (const file of files) {
+      const fileTypeSupported =
+        acceptedImageTypes.includes(file.type) ||
+        /\.(jpe?g|png|webp)$/i.test(file.name);
+
+      if (!fileTypeSupported) {
+        rejectedFiles.push(file.name);
+        continue;
+      }
+
+      if (file.size > maxFileSize) {
+        rejectedFiles.push(file.name);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (!validFiles.length) {
+      if (rejectedFiles.length > 0) {
+        setNotice(
+          "File is too large. Maximum allowed size is 100 MB per image.",
+        );
+      } else {
+        setNotice("Please choose a JPG, JPEG, PNG, or WEBP image.");
+      }
       return;
     }
+
     const added = await Promise.all(
-      files.map(async (file) => {
+      validFiles.map(async (file) => {
         const url = await fileToDataUrl(file);
         const natural = await loadImage(url);
         return {
@@ -405,6 +440,7 @@ function App() {
         };
       }),
     );
+
     setImages((current) => [...current, ...added]);
     setSelectedId(added[0]?.id || null);
     setNotice("");
@@ -589,8 +625,7 @@ function App() {
                   or <span>browse from your computer</span>
                 </p>
                 <small>
-                  JPG, PNG or WEBP Â· up to 25 MB each Â· multiple files
-                  supported
+                  JPG, PNG or WEBP • Up to 100 MB each • Multiple files supported
                 </small>
               </div>
               <div className="section-head">
@@ -602,7 +637,7 @@ function App() {
                   </h3>
                   <p>
                     {images.length
-                      ? `${images.length} image${images.length === 1 ? "" : "s"} Â· ${processed} processed${images.length > 1 ? ` Â· ${processed} / ${images.length}` : ""}`
+                      ? `${images.length} image${images.length === 1 ? "" : "s"} • ${processed} processed${images.length > 1 ? ` • ${processed} / ${images.length}` : ""}`
                       : "Your recent projects will appear here."}
                   </p>
                 </div>
@@ -782,7 +817,7 @@ function App() {
                           ? "water mark png"
                           : "Custom logo uploaded"}
                       </b>
-                      <small>Current logo Â· transparent PNG</small>
+                      <small>Current logo • transparent PNG</small>
                     </div>
                     <Upload size={16} />
                   </button>
@@ -870,7 +905,7 @@ function App() {
                         update({ margin: Math.max(1, settings.margin - 1) })
                       }
                     >
-                      âˆ’
+                      −
                     </button>
                     <b>{settings.margin}%</b>
                     <button
@@ -895,7 +930,7 @@ function App() {
                         })
                       }
                     >
-                      âˆ’
+                      −
                     </button>
                     <b>{settings.jpgQuality}%</b>
                     <button
@@ -1053,7 +1088,7 @@ function App() {
             <p className="eyebrow">WELCOME TO AUTO WATERMARK STUDIO</p>
             <h2>Set your brand watermark</h2>
             <p className="modal-copy">
-              Your bundled â€œwater mark pngâ€ is ready. Every image you upload
+              Your bundled “water mark png” is ready. Every image you upload
               will be branded automatically.
             </p>
             <button
