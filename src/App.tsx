@@ -79,12 +79,12 @@ const defaultSettings: Settings = {
   logoData: defaultLogo,
   companyName: "ABSARA BEAUTY PARLOUR & ACADEMY",
   position: "bottom-right",
-  size: 15,
-  opacity: 85,
-  margin: 4,
+  size: 24,
+  opacity: 100,
+  margin: 10,
   rotation: 0,
   preset: "original",
-  jpgQuality: 95,
+  jpgQuality: 100,
 };
 const positions: Position[] = [
   "top-left",
@@ -232,14 +232,65 @@ function watermarkPosition(
   };
 }
 function calculate4kDimensions(width: number, height: number) {
-  const aspectRatio = width / height;
-  if (aspectRatio === 1) return { width: 3840, height: 3840 };
-  if (aspectRatio > 1)
-    return { width: 3840, height: Math.round(3840 / aspectRatio) };
-  return { width: 2160, height: Math.round(2160 / aspectRatio) };
+  const maxDimension = 3840;
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
 }
 
-async function renderWatermark(
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  mimeType: string,
+  quality?: number,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    if (typeof canvas.toBlob === "function") {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Canvas export failed."));
+        },
+        mimeType,
+        quality,
+      );
+      return;
+    }
+
+    try {
+      const dataUrl = canvas.toDataURL(mimeType, quality);
+      const bytes = atob(dataUrl.split(",")[1]);
+      const buffer = new Uint8Array(bytes.length);
+      for (let index = 0; index < bytes.length; index += 1) {
+        buffer[index] = bytes.charCodeAt(index);
+      }
+      resolve(new Blob([buffer], { type: mimeType }));
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  try {
+    link.click();
+  } catch (error) {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    link.remove();
+  }, 1200);
+}
+
+async function renderWatermarkCanvas(
   image: ImageItem,
   settings: Settings,
   requestedPreset?: PresetKey,
@@ -330,6 +381,15 @@ async function renderWatermark(
     size.height,
   );
   context.restore();
+  return canvas;
+}
+
+async function renderWatermark(
+  image: ImageItem,
+  settings: Settings,
+  requestedPreset?: PresetKey,
+) {
+  const canvas = await renderWatermarkCanvas(image, settings, requestedPreset);
   return {
     dataUrl: canvas.toDataURL("image/png", 1),
     width: canvas.width,
@@ -462,21 +522,17 @@ function App() {
     type: "png" | "jpg",
     requestedPreset?: PresetKey,
   ) => {
-    const rendered = await renderWatermark(image, settings, requestedPreset);
-    let href = rendered.dataUrl;
-    if (type === "jpg") {
-      const canvas = document.createElement("canvas");
-      canvas.width = rendered.width;
-      canvas.height = rendered.height;
-      const context = canvas.getContext("2d");
-      const source = await loadImage(rendered.dataUrl);
-      context?.drawImage(source, 0, 0);
-      href = canvas.toDataURL("image/jpeg", settings.jpgQuality / 100);
+    try {
+      const canvas = await renderWatermarkCanvas(image, settings, requestedPreset);
+      const mimeType = type === "jpg" ? "image/jpeg" : "image/png";
+      const quality = type === "jpg" ? settings.jpgQuality / 100 : undefined;
+      const blob = await canvasToBlob(canvas, mimeType, quality);
+      const filename = `${image.name.replace(/\.[^/.]+$/, "")}-watermarked.${type}`;
+      triggerDownload(blob, filename);
+    } catch (error) {
+      console.error("4K JPG export failed. Please try again.", error);
+      setNotice("4K JPG export failed. Please try again.");
     }
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = `${image.name.replace(/\.[^/.]+$/, "")}-watermarked.${type}`;
-    link.click();
   };
   const downloadAll = async () => {
     const zip = new JSZip();
